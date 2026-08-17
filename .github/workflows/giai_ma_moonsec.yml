@@ -11,11 +11,11 @@ jobs:
   deob:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout repo của bạn (chứa src/deob/pipeline.lua + input.lua)
+      # 1. Checkout repo fork của bạn (chứa src/deob/cli.lua + input.lua)
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Cài Lua 5.1 + LuaRocks (MoonSec / Prometheus thường xài Lua 5.1)
+      # 2. Cài Lua 5.1 + LuaRocks
       - name: Install Lua 5.1
         run: |
           sudo apt-get update
@@ -23,21 +23,24 @@ jobs:
           sudo luarocks install luasocket
           sudo luarocks install luafilesystem
 
-      # 3. Clone Prometheus về đúng vị trí repo-root/Prometheus/
-      # Đổi "levno-710/Prometheus" thành tên repo chuẩn của Prometheus mà bạn muốn dùng
-      - name: Checkout Prometheus deobfuscator
+      # 3. Clone Prometheus obfuscator (wcrddn/Prometheus - bản đúng cho repo này)
+      - name: Checkout Prometheus obfuscator
         uses: actions/checkout@v4
         with:
-          repository: levno-710/Prometheus
+          repository: wcrddn/Prometheus
           path: Prometheus
 
-      # 4. Kiểm tra xem clone thành công chưa
-      - name: Verify Prometheus files
+      # 4. Verify cấu trúc thư mục
+      - name: Verify structure
         run: |
-          ls -la Prometheus/
+          echo "=== Root ==="
+          ls -la
+          echo "=== src/deob ==="
+          ls -la src/deob/
+          echo "=== Prometheus/src/prometheus ==="
           ls -la Prometheus/src/prometheus/
 
-      # 5. Kiểm tra file input.lua có tồn tại
+      # 5. Kiểm tra input.lua tồn tại
       - name: Check input file
         run: |
           if [ ! -f "input.lua" ]; then
@@ -45,15 +48,24 @@ jobs:
             exit 1
           fi
 
-      # 6. Chạy pipeline
-      - name: Run deobfuscation pipeline
+      # 6. Chạy CLI deobfuscator (KHÔNG phải pipeline.lua)
+      - name: Run deobfuscation
         run: |
-          export LUA_PATH="src/deob/?.lua;Prometheus/src/?.lua;Prometheus/src/?/init.lua;;"
-          lua src/deob/pipeline.lua --input input.lua --output ket_qua_clean.lua
+          export LUA_PATH="src/deob/?.lua;src/deob/?/init.lua;Prometheus/src/?.lua;Prometheus/src/?/init.lua;;"
+          lua src/deob/cli.lua input.lua --trace off --out ket_qua_clean.lua
 
-      # 7. Upload kết quả
+      # 7. DEBUG: Kiểm tra file output có được tạo không
+      - name: List output files
+        run: |
+          echo "=== Files in root after run ==="
+          ls -la
+          echo "=== All .lua files ==="
+          find . -name "*.lua" -newer input.lua
+
+      # 8. Upload kết quả
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
           name: ket_qua_clean
           path: ket_qua_clean.lua
+          if-no-files-found: error
