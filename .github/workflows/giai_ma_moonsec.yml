@@ -1,36 +1,52 @@
-name: Giai Ma MoonSec V3
+name: Deobfuscate Lua (MoonSec 3)
 
 on:
-  workflow_dispatch: # Cho phép bạn bấm nút chạy thủ công trên giao diện Web
+  workflow_dispatch:
+  push:
+    paths:
+      - 'input.lua'
+      - 'src/deob/**'
 
 jobs:
-  deobfuscate:
+  deob:
     runs-on: ubuntu-latest
-
     steps:
-    # 1. Tải bộ công cụ Prometheus từ tài khoản của bạn vào máy chủ ảo
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      # 1. Checkout repo của bạn (chứa src/deob/pipeline.lua + input.lua)
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    # 2. Cài đặt môi trường Lua 5.1 (MoonSec V3 chạy trên nền tảng này)
-    - name: Set up Lua
-      uses: leafo/gh-actions-lua@v10
-      with:
-        luaVersion: "5.1"
+      # 2. Cài Lua 5.1 + LuaRocks (MoonSec / Prometheus thường xài Lua 5.1)
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 liblua5.1-0-dev luarocks
+          sudo luarocks install luasocket
+          sudo luarocks install luafilesystem
 
-    # 3. Chạy lệnh giải mã file input.lua bằng pipeline của Prometheus
-    - name: Run Prometheus Deobfuscator
-      run: |
-        if [ -f "input.lua" ]; then
+      # 3. Clone Prometheus về đúng vị trí repo-root/Prometheus/
+      - name: Clone Prometheus deobfuscator
+        run: |
+          git clone --depth 1 https://github.com/MLG-Boyz/Prometheus.git Prometheus
+          ls -la Prometheus/src/prometheus/
+
+      # 4. Kiểm tra file input.lua có tồn tại
+      - name: Check input file
+        run: |
+          if [ ! -f "input.lua" ]; then
+            echo "ERROR: Khong tim thay file input.lua!"
+            exit 1
+          fi
+
+      # 5. Chạy pipeline
+      - name: Run deobfuscation pipeline
+        run: |
+          # Thêm Prometheus/src vào LUA_PATH cho chắc chắn
+          export LUA_PATH="src/deob/?.lua;Prometheus/src/?.lua;Prometheus/src/?/init.lua;;"
           lua src/deob/pipeline.lua --input input.lua --output ket_qua_clean.lua
-        else
-          echo "ERROR: Khong tim thay file input.lua! Vui long doc lai Buoc 5."
-          exit 1
-        fi
 
-    # 4. Xuất file mã nguồn đã gỡ sạch lên hệ thống để bạn tải về
-    - name: Upload Clean Script
-      uses: actions/upload-artifact@v4
-      with:
-        name: Source-Code-Da-Go
-        path: ket_qua_clean.lua
+      # 6. Upload kết quả
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: ket_qua_clean
+          path: ket_qua_clean.lua
