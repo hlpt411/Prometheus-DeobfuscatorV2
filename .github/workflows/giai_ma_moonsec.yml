@@ -24,12 +24,20 @@ jobs:
           sudo luarocks install luafilesystem
 
       # 3. Clone Prometheus về đúng vị trí repo-root/Prometheus/
-      - name: Clone Prometheus deobfuscator
+      # Đổi "levno-710/Prometheus" thành tên repo chuẩn của Prometheus mà bạn muốn dùng
+      - name: Checkout Prometheus deobfuscator
+        uses: actions/checkout@v4
+        with:
+          repository: levno-710/Prometheus
+          path: Prometheus
+
+      # 4. Kiểm tra xem clone thành công chưa
+      - name: Verify Prometheus files
         run: |
-          git clone --depth 1 https://github.com/MLG-Boyz/Prometheus.git Prometheus
+          ls -la Prometheus/
           ls -la Prometheus/src/prometheus/
 
-      # 4. Kiểm tra file input.lua có tồn tại
+      # 5. Kiểm tra file input.lua có tồn tại
       - name: Check input file
         run: |
           if [ ! -f "input.lua" ]; then
@@ -37,14 +45,13 @@ jobs:
             exit 1
           fi
 
-      # 5. Chạy pipeline
+      # 6. Chạy pipeline
       - name: Run deobfuscation pipeline
         run: |
-          # Thêm Prometheus/src vào LUA_PATH cho chắc chắn
           export LUA_PATH="src/deob/?.lua;Prometheus/src/?.lua;Prometheus/src/?/init.lua;;"
           lua src/deob/pipeline.lua --input input.lua --output ket_qua_clean.lua
 
-      # 6. Upload kết quả
+      # 7. Upload kết quả
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
